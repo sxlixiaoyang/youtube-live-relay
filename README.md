@@ -8,6 +8,7 @@
 - **自动重连**：断流时自动重启整个管道，指数退避重试
 - **守护进程**：持续监控 streamlink 和 FFmpeg 进程状态
 - **本地 RTMP 服务器**：内置 mediamtx，开箱即用
+- **Web 管理面板**：实时状态监控、日志查看、配置热更新（默认 `http://localhost:5000`）
 
 ## 架构
 
@@ -56,6 +57,7 @@ youtube-relay/
 ```bash
 cd youtube-relay
 pip install -r requirements.txt
+cp config.yaml.example config.yaml   # 首次使用，复制示例配置
 ```
 
 ## 配置
@@ -118,6 +120,11 @@ python main.py
 | reconnect.max_delay | 60 | 最大重连延迟 |
 | ffmpeg.video_codec | copy | 视频编码（copy=不转码） |
 | ffmpeg.audio_codec | copy | 音频编码（copy=不转码） |
+| enable_ui | true | 是否启用 Web 管理面板 |
+| web_ui.host | localhost | Web 面板监听地址 |
+| web_ui.port | 5000 | Web 面板端口 |
+| cookie_server.host | localhost | Cookie 服务监听地址 |
+| cookie_server.port | 8080 | Cookie 服务端口 |
 
 ## 常见问题
 
