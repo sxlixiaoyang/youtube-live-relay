@@ -1,0 +1,1184 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube 直播转播</title>
+    <style>
+        :root {
+            --bg: #0f1117;
+            --surface: #1a1d27;
+            --surface2: #242836;
+            --border: #2e3345;
+            --text: #e4e6ef;
+            --text2: #8b8fa3;
+            --primary: #6c5ce7;
+            --primary-light: #a29bfe;
+            --success: #00b894;
+            --warning: #fdcb6e;
+            --danger: #e17055;
+            --info: #74b9ff;
+            --radius: 12px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        /* Header */
+        .header {
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header-logo {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, var(--primary), var(--danger));
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+
+        .header-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .header-subtitle {
+            font-size: 12px;
+            color: var(--text2);
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .status-badge.running {
+            background: rgba(0, 184, 148, 0.15);
+            color: var(--success);
+        }
+
+        .status-badge.stopped {
+            background: rgba(225, 112, 85, 0.15);
+            color: var(--danger);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .status-badge.running .status-dot {
+            background: var(--success);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .status-badge.stopped .status-dot {
+            background: var(--danger);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        .uptime {
+            font-size: 13px;
+            color: var(--text2);
+        }
+
+        /* Tabs */
+        .tabs {
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            padding: 0 24px;
+            gap: 4px;
+        }
+
+        .tab {
+            padding: 12px 20px;
+            font-size: 14px;
+            color: var(--text2);
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .tab:hover { color: var(--text); }
+        .tab.active {
+            color: var(--primary-light);
+            border-bottom-color: var(--primary);
+        }
+
+        /* Main Content */
+        .main {
+            padding: 24px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* Cards */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+        }
+
+        .card-title {
+            font-size: 13px;
+            color: var(--text2);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card-value {
+            font-size: 28px;
+            font-weight: 700;
+        }
+
+        .card-detail {
+            font-size: 13px;
+            color: var(--text2);
+            margin-top: 8px;
+        }
+
+        /* Pipeline Status */
+        .pipeline {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 20px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .pipeline-node {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            min-width: 120px;
+        }
+
+        .pipeline-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            background: var(--surface2);
+        }
+
+        .pipeline-icon.alive {
+            background: rgba(0, 184, 148, 0.2);
+            box-shadow: 0 0 12px rgba(0, 184, 148, 0.3);
+        }
+
+        .pipeline-icon.dead {
+            background: rgba(225, 112, 85, 0.2);
+        }
+
+        .pipeline-label {
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .pipeline-status {
+            font-size: 12px;
+        }
+
+        .pipeline-status.alive { color: var(--success); }
+        .pipeline-status.dead { color: var(--danger); }
+
+        .pipeline-arrow {
+            font-size: 20px;
+            color: var(--text2);
+        }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            padding: 10px 24px;
+            border-radius: 8px;
+            border: none;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-light);
+        }
+
+        .btn-danger {
+            background: rgba(225, 112, 85, 0.2);
+            color: var(--danger);
+            border: 1px solid rgba(225, 112, 85, 0.3);
+        }
+
+        .btn-danger:hover {
+            background: rgba(225, 112, 85, 0.3);
+        }
+
+        .btn-success {
+            background: rgba(0, 184, 148, 0.2);
+            color: var(--success);
+            border: 1px solid rgba(0, 184, 148, 0.3);
+        }
+
+        .btn-success:hover {
+            background: rgba(0, 184, 148, 0.3);
+        }
+
+        .btn-outline {
+            background: transparent;
+            color: var(--text2);
+            border: 1px solid var(--border);
+        }
+
+        .btn-outline:hover {
+            background: var(--surface2);
+            color: var(--text);
+        }
+
+        /* Log Console */
+        .log-console {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            overflow: hidden;
+        }
+
+        .log-header {
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .log-header-title {
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .log-body {
+            height: 500px;
+            overflow-y: auto;
+            padding: 12px 16px;
+            font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+            font-size: 13px;
+            line-height: 1.7;
+        }
+
+        .log-line {
+            display: flex;
+            gap: 12px;
+            padding: 2px 0;
+        }
+
+        .log-line:hover {
+            background: rgba(255,255,255,0.03);
+        }
+
+        .log-time {
+            color: var(--text2);
+            flex-shrink: 0;
+            min-width: 65px;
+        }
+
+        .log-level {
+            flex-shrink: 0;
+            min-width: 50px;
+            font-weight: 600;
+        }
+
+        .log-level.DEBUG { color: var(--text2); }
+        .log-level.INFO { color: var(--info); }
+        .log-level.WARNING { color: var(--warning); }
+        .log-level.ERROR { color: var(--danger); }
+
+        .log-logger {
+            color: var(--primary-light);
+            flex-shrink: 0;
+            min-width: 110px;
+        }
+
+        .log-msg {
+            color: var(--text);
+            word-break: break-all;
+        }
+
+        /* Config Form */
+        .config-section {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+            margin-bottom: 16px;
+        }
+
+        .config-section-title {
+            font-size: 15px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 16px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .form-label {
+            font-size: 13px;
+            color: var(--text2);
+            font-weight: 500;
+        }
+
+        .form-input {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px 14px;
+            color: var(--text);
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .form-input:focus {
+            border-color: var(--primary);
+        }
+
+        .form-input::placeholder {
+            color: var(--text2);
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text2); }
+
+        /* Info row */
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .info-row:last-child { border-bottom: none; }
+
+        .info-key {
+            font-size: 13px;
+            color: var(--text2);
+        }
+
+        .info-value {
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .info-value.mono {
+            font-family: 'Cascadia Code', Consolas, monospace;
+            font-size: 13px;
+            color: var(--primary-light);
+        }
+
+        /* Toast */
+        .toast-container {
+            position: fixed;
+            top: 80px;
+            right: 24px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .toast {
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            animation: slideIn 0.3s ease;
+            max-width: 360px;
+        }
+
+        .toast.success {
+            background: rgba(0, 184, 148, 0.2);
+            border: 1px solid rgba(0, 184, 148, 0.3);
+            color: var(--success);
+        }
+
+        .toast.error {
+            background: rgba(225, 112, 85, 0.2);
+            border: 1px solid rgba(225, 112, 85, 0.3);
+            color: var(--danger);
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(100px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.6);
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.2s ease;
+        }
+
+        .modal-overlay.hiding {
+            animation: fadeOut 0.2s ease forwards;
+        }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+
+        .modal {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 28px 32px;
+            max-width: 480px;
+            width: 90%;
+            animation: modalIn 0.25s ease;
+            text-align: center;
+        }
+
+        .modal-overlay.hiding .modal {
+            animation: modalOut 0.2s ease forwards;
+        }
+
+        @keyframes modalIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        @keyframes modalOut { from { transform: scale(1); opacity: 1; } to { transform: scale(0.9); opacity: 0; } }
+
+        .modal-icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+
+        .modal-title {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .modal-desc {
+            font-size: 14px;
+            color: var(--text2);
+            margin-bottom: 16px;
+        }
+
+        .modal-url {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px 16px;
+            font-family: 'Cascadia Code', Consolas, monospace;
+            font-size: 13px;
+            color: var(--primary-light);
+            word-break: break-all;
+            margin-bottom: 20px;
+            user-select: all;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+
+        /* Copy button in card */
+        .copy-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 12px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: var(--surface2);
+            color: var(--text2);
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 8px;
+        }
+
+        .copy-btn:hover:not(:disabled) {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        .copy-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .copy-btn.copied {
+            background: rgba(0, 184, 148, 0.2);
+            color: var(--success);
+            border-color: rgba(0, 184, 148, 0.3);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header { padding: 12px 16px; }
+            .main { padding: 16px; }
+            .pipeline { gap: 8px; }
+            .pipeline-node { min-width: 80px; }
+            .grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="header-left">
+            <div class="header-logo">&#9654;</div>
+            <div>
+                <div class="header-title">YouTube 直播转播</div>
+                <div class="header-subtitle" id="headerUrl">--</div>
+            </div>
+        </div>
+        <div class="header-right">
+            <div class="uptime" id="uptime">运行: --</div>
+            <div class="status-badge stopped" id="statusBadge">
+                <div class="status-dot"></div>
+                <span id="statusText">已停止</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+        <div class="tab active" data-tab="dashboard">仪表盘</div>
+        <div class="tab" data-tab="logs">日志</div>
+        <div class="tab" data-tab="config">配置</div>
+    </div>
+
+    <!-- Main -->
+    <div class="main">
+        <!-- Dashboard -->
+        <div class="tab-content active" id="tab-dashboard">
+            <!-- Pipeline -->
+            <div class="pipeline" id="pipeline">
+                <div class="pipeline-node">
+                    <div class="pipeline-icon dead" id="iconStreamlink">&#9654;</div>
+                    <div class="pipeline-label">Streamlink</div>
+                    <div class="pipeline-status dead" id="statusStreamlink">未运行</div>
+                </div>
+                <div class="pipeline-arrow">&#10132;</div>
+                <div class="pipeline-node">
+                    <div class="pipeline-icon dead" id="iconFfmpeg">&#9654;</div>
+                    <div class="pipeline-label">FFmpeg</div>
+                    <div class="pipeline-status dead" id="statusFfmpeg">未运行</div>
+                </div>
+                <div class="pipeline-arrow">&#10132;</div>
+                <div class="pipeline-node">
+                    <div class="pipeline-icon" id="iconRtmp">&#9654;</div>
+                    <div class="pipeline-label">mediamtx</div>
+                    <div class="pipeline-status" id="statusRtmp" style="color:var(--text2)">RTMP</div>
+                </div>
+                <div class="pipeline-arrow">&#10132;</div>
+                <div class="pipeline-node">
+                    <div class="pipeline-icon">&#9654;</div>
+                    <div class="pipeline-label">OBS</div>
+                    <div class="pipeline-status" style="color:var(--text2)">播放</div>
+                </div>
+            </div>
+
+            <!-- Controls -->
+            <div class="controls">
+                <button class="btn btn-success" id="btnStart" onclick="startRelay()">&#9654; 启动转播</button>
+                <button class="btn btn-danger" id="btnStop" onclick="stopRelay()" disabled>&#9632; 停止转播</button>
+                <button class="btn btn-outline" onclick="refreshStatus()">&#8635; 刷新</button>
+            </div>
+
+            <!-- Stats -->
+            <div class="grid">
+                <div class="card">
+                    <div class="card-title">&#128279; 直播源</div>
+                    <div class="card-value" style="font-size:16px;word-break:break-all" id="cardUrl">--</div>
+                    <div class="card-detail">画质: <span id="cardQuality">--</span></div>
+                </div>
+                <div class="card">
+                    <div class="card-title">&#127760; 代理</div>
+                    <div class="card-value" style="font-size:16px" id="cardProxy">--</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">&#128225; 推流地址</div>
+                    <div class="card-value" style="font-size:14px;font-family:monospace" id="cardRtmp">--</div>
+                    <div class="card-detail">OBS 媒体源地址</div>
+                    <button class="copy-btn" id="btnCopyRtmp" disabled onclick="copyRtmpUrl()">
+                        <span id="copyIcon">&#128203;</span> <span id="copyText">复制地址</span>
+                    </button>
+                </div>
+                <div class="card">
+                    <div class="card-title">&#127850; Cookies</div>
+                    <div class="card-value" id="cardCookies">0</div>
+                    <div class="card-detail" id="cardCookieDetail">未收到 Cookies</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">&#128260; 重连</div>
+                    <div class="card-value" id="cardRetry">0</div>
+                    <div class="card-detail" id="cardRetryDetail">最大重试: 0 (无限)</div>
+                </div>
+            </div>
+
+            <!-- Quick Info -->
+            <div class="card">
+                <div class="card-title">&#128196; 使用说明</div>
+                <div class="info-row">
+                    <span class="info-key">1. Chrome 扩展</span>
+                    <span class="info-value">安装 chrome-extension/ 目录下的扩展</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-key">2. 发送 Cookies</span>
+                    <span class="info-value">打开 YouTube 页面，扩展自动发送</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-key">3. OBS 媒体源</span>
+                    <span class="info-value mono" id="infoRtmp">--</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Logs -->
+        <div class="tab-content" id="tab-logs">
+            <div class="log-console">
+                <div class="log-header">
+                    <span class="log-header-title">实时日志</span>
+                    <div style="display:flex;gap:8px;align-items:center">
+                        <label style="font-size:13px;color:var(--text2)">
+                            <input type="checkbox" id="logAutoScroll" checked> 自动滚动
+                        </label>
+                        <label style="font-size:13px;color:var(--text2)">
+                            <select id="logFilter" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:2px 8px">
+                                <option value="">全部</option>
+                                <option value="DEBUG">DEBUG</option>
+                                <option value="INFO" selected>INFO+</option>
+                                <option value="WARNING">WARNING+</option>
+                                <option value="ERROR">ERROR</option>
+                            </select>
+                        </label>
+                        <button class="btn btn-outline" style="padding:4px 12px;font-size:12px" onclick="clearLogs()">清空</button>
+                    </div>
+                </div>
+                <div class="log-body" id="logBody"></div>
+            </div>
+        </div>
+
+        <!-- Config -->
+        <div class="tab-content" id="tab-config">
+            <div class="config-section">
+                <div class="config-section-title">基本设置</div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">YouTube 直播地址</label>
+                        <input class="form-input" id="cfgUrl" placeholder="https://www.youtube.com/watch?v=...">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">代理地址</label>
+                        <input class="form-input" id="cfgProxy" placeholder="http://127.0.0.1:7890">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">画质偏好</label>
+                        <select class="form-input" id="cfgQuality">
+                            <option value="best">best (最佳)</option>
+                            <option value="1080p">1080p</option>
+                            <option value="720p">720p</option>
+                            <option value="480p">480p</option>
+                            <option value="360p">360p</option>
+                            <option value="worst">worst (最低)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="config-section">
+                <div class="config-section-title">RTMP 推流设置</div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">主机</label>
+                        <input class="form-input" id="cfgRtmpHost" placeholder="localhost">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">端口</label>
+                        <input class="form-input" id="cfgRtmpPort" type="number" placeholder="1935">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">App 名称</label>
+                        <input class="form-input" id="cfgRtmpApp" placeholder="live">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">流密钥</label>
+                        <input class="form-input" id="cfgRtmpKey" placeholder="youtube">
+                    </div>
+                </div>
+            </div>
+
+            <div class="config-section">
+                <div class="config-section-title">FFmpeg 设置</div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">视频编码</label>
+                        <select class="form-input" id="cfgVideoCodec">
+                            <option value="copy">copy (不转码)</option>
+                            <option value="libx264">libx264</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">音频编码</label>
+                        <select class="form-input" id="cfgAudioCodec">
+                            <option value="copy">copy (不转码)</option>
+                            <option value="aac">aac</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">FFmpeg 路径 (可选)</label>
+                        <input class="form-input" id="cfgFfmpegPath" placeholder="./ffmpeg-8.1.1/bin/ffmpeg.exe">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">额外参数 (可选)</label>
+                        <input class="form-input" id="cfgExtraArgs" placeholder="">
+                    </div>
+                </div>
+            </div>
+
+            <div class="controls">
+                <button class="btn btn-primary" onclick="saveConfig()">&#128190; 保存配置</button>
+                <button class="btn btn-outline" onclick="loadConfig()">&#8635; 重置</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: 推流成功提示 -->
+    <div class="modal-overlay" id="modalOverlay" style="display:none">
+        <div class="modal">
+            <div class="modal-icon">&#9989;</div>
+            <div class="modal-title">推流目标连接成功</div>
+            <div class="modal-desc">在 OBS 中添加「媒体源」，输入以下地址即可观看</div>
+            <div class="modal-url" id="modalRtmpUrl">--</div>
+            <div class="modal-actions">
+                <button class="btn btn-primary" onclick="copyFromModal()">&#128203; 复制地址</button>
+                <button class="btn btn-outline" onclick="closeModal()">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast-container" id="toasts"></div>
+
+    <script>
+        // ---- State ----
+        let logOffset = 0;
+        let refreshTimer = null;
+        let prevFfmpegAlive = false;
+        let currentRtmpUrl = '';
+
+        // ---- Tabs ----
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                tab.classList.add('active');
+                document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+            });
+        });
+
+        // ---- Toast ----
+        function showToast(msg, type = 'success') {
+            const container = document.getElementById('toasts');
+            const el = document.createElement('div');
+            el.className = 'toast ' + type;
+            el.textContent = msg;
+            container.appendChild(el);
+            setTimeout(() => el.remove(), 3000);
+        }
+
+        // ---- API ----
+        async function api(path, method = 'GET', body = null) {
+            const opts = { method };
+            if (body) {
+                opts.headers = { 'Content-Type': 'application/json' };
+                opts.body = JSON.stringify(body);
+            }
+            const res = await fetch(path, opts);
+            return res.json();
+        }
+
+        // ---- Status ----
+        async function refreshStatus() {
+            try {
+                const data = await api('/api/status');
+                if (!data.success) return;
+
+                const { running, uptime, pipeline, reconnect, cookies, rtmp_url, youtube_url, proxy, quality } = data;
+
+                // Header
+                document.getElementById('headerUrl').textContent = youtube_url || '--';
+                document.getElementById('uptime').textContent = '运行: ' + formatUptime(uptime);
+
+                const badge = document.getElementById('statusBadge');
+                const statusText = document.getElementById('statusText');
+                badge.className = 'status-badge ' + (running ? 'running' : 'stopped');
+                statusText.textContent = running ? '运行中' : '已停止';
+
+                // Pipeline
+                updateNode('Streamlink', pipeline.streamlink.alive, pipeline.streamlink.exit_code);
+                updateNode('Ffmpeg', pipeline.ffmpeg.alive, pipeline.ffmpeg.exit_code);
+
+                // Cards
+                document.getElementById('cardUrl').textContent = youtube_url || '--';
+                document.getElementById('cardQuality').textContent = quality;
+                document.getElementById('cardProxy').textContent = proxy || '--';
+                document.getElementById('cardRtmp').textContent = rtmp_url;
+                document.getElementById('cardCookies').textContent = cookies.count;
+                document.getElementById('cardCookieDetail').textContent =
+                    cookies.count > 0 ? '最后更新: ' + formatTime(cookies.last_update) : '未收到 Cookies';
+                document.getElementById('cardRetry').textContent = reconnect.retry_count;
+                const maxR = reconnect.max_retries;
+                document.getElementById('cardRetryDetail').textContent =
+                    maxR === 0 ? '无限重试' : `最大重试: ${maxR}`;
+
+                // Info
+                document.getElementById('infoRtmp').textContent = rtmp_url;
+                currentRtmpUrl = rtmp_url;
+
+                // Copy button: only enabled when FFmpeg is alive
+                document.getElementById('btnCopyRtmp').disabled = !pipeline.ffmpeg.alive;
+
+                // Buttons
+                document.getElementById('btnStart').disabled = running;
+                document.getElementById('btnStop').disabled = !running;
+
+                // 弹窗：FFmpeg 从未运行变为运行时，说明推流管道已成功建立
+                if (pipeline.ffmpeg.alive && !prevFfmpegAlive) {
+                    document.getElementById('modalRtmpUrl').textContent = rtmp_url;
+                    showModal();
+                }
+                prevFfmpegAlive = pipeline.ffmpeg.alive;
+            } catch (e) {
+                console.error('刷新状态失败:', e);
+            }
+        }
+
+        function updateNode(name, alive, exitCode) {
+            const id = name;
+            const icon = document.getElementById('icon' + id);
+            const status = document.getElementById('status' + id);
+            if (icon) {
+                icon.className = 'pipeline-icon ' + (alive ? 'alive' : 'dead');
+            }
+            if (status) {
+                status.className = 'pipeline-status ' + (alive ? 'alive' : 'dead');
+                status.textContent = alive ? '运行中' : (exitCode != null ? `退出 (${exitCode})` : '未运行');
+            }
+        }
+
+        function formatUptime(seconds) {
+            if (seconds < 60) return Math.floor(seconds) + '秒';
+            const m = Math.floor(seconds / 60);
+            if (m < 60) return m + '分' + Math.floor(seconds % 60) + '秒';
+            const h = Math.floor(m / 60);
+            return h + '时' + (m % 60) + '分';
+        }
+
+        function formatTime(ts) {
+            if (!ts) return '--';
+            const d = new Date(ts * 1000);
+            return d.toLocaleTimeString();
+        }
+
+        // ---- Logs ----
+        let allLogs = [];
+
+        async function fetchLogs() {
+            try {
+                const data = await api(`/api/logs?offset=${logOffset}&limit=50`);
+                if (data.success && data.logs.length > 0) {
+                    allLogs = allLogs.concat(data.logs);
+                    if (allLogs.length > 500) allLogs = allLogs.slice(-500);
+                    logOffset = data.total;
+                    renderLogs();
+                }
+            } catch (e) {}
+        }
+
+        function renderLogs() {
+            const body = document.getElementById('logBody');
+            const filter = document.getElementById('logFilter').value;
+            const levels = { '': [], 'DEBUG': ['DEBUG','INFO','WARNING','ERROR'], 'INFO': ['INFO','WARNING','ERROR'], 'WARNING': ['WARNING','ERROR'], 'ERROR': ['ERROR'] };
+            const allowed = levels[filter] || [];
+
+            let html = '';
+            for (const log of allLogs) {
+                if (allowed.length > 0 && !allowed.includes(log.level)) continue;
+                html += `<div class="log-line">
+                    <span class="log-time">${log.time}</span>
+                    <span class="log-level ${log.level}">${log.level}</span>
+                    <span class="log-logger">${log.logger}</span>
+                    <span class="log-msg">${escapeHtml(log.message)}</span>
+                </div>`;
+            }
+            body.innerHTML = html;
+
+            if (document.getElementById('logAutoScroll').checked) {
+                body.scrollTop = body.scrollHeight;
+            }
+        }
+
+        function clearLogs() {
+            allLogs = [];
+            logOffset = 0;
+            document.getElementById('logBody').innerHTML = '';
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        document.getElementById('logFilter').addEventListener('change', renderLogs);
+
+        // ---- Config ----
+        async function loadConfig() {
+            try {
+                const data = await api('/api/config');
+                if (!data.success) return;
+                const c = data.config;
+                document.getElementById('cfgUrl').value = c.youtube_url || '';
+                document.getElementById('cfgProxy').value = c.proxy || '';
+                document.getElementById('cfgQuality').value = c.quality || 'best';
+                const rtmp = c.rtmp || {};
+                document.getElementById('cfgRtmpHost').value = rtmp.host || 'localhost';
+                document.getElementById('cfgRtmpPort').value = rtmp.port || 1935;
+                document.getElementById('cfgRtmpApp').value = rtmp.app || 'live';
+                document.getElementById('cfgRtmpKey').value = rtmp.key || 'youtube';
+                const ffmpeg = c.ffmpeg || {};
+                document.getElementById('cfgVideoCodec').value = ffmpeg.video_codec || 'copy';
+                document.getElementById('cfgAudioCodec').value = ffmpeg.audio_codec || 'copy';
+                document.getElementById('cfgFfmpegPath').value = ffmpeg.path || '';
+                document.getElementById('cfgExtraArgs').value = ffmpeg.extra_args || '';
+            } catch (e) {
+                console.error('加载配置失败:', e);
+            }
+        }
+
+        async function saveConfig() {
+            try {
+                const body = {
+                    youtube_url: document.getElementById('cfgUrl').value,
+                    proxy: document.getElementById('cfgProxy').value,
+                    quality: document.getElementById('cfgQuality').value,
+                    rtmp: {
+                        host: document.getElementById('cfgRtmpHost').value,
+                        port: parseInt(document.getElementById('cfgRtmpPort').value) || 1935,
+                        app: document.getElementById('cfgRtmpApp').value,
+                        key: document.getElementById('cfgRtmpKey').value,
+                    },
+                    ffmpeg: {
+                        video_codec: document.getElementById('cfgVideoCodec').value,
+                        audio_codec: document.getElementById('cfgAudioCodec').value,
+                        path: document.getElementById('cfgFfmpegPath').value,
+                        extra_args: document.getElementById('cfgExtraArgs').value,
+                    },
+                };
+                const data = await api('/api/config', 'POST', body);
+                if (data.success) {
+                    showToast('配置已保存: ' + data.message);
+                } else {
+                    showToast('保存失败: ' + data.message, 'error');
+                }
+            } catch (e) {
+                showToast('保存失败: ' + e.message, 'error');
+            }
+        }
+
+        // ---- Controls ----
+        async function startRelay() {
+            try {
+                const data = await api('/api/start', 'POST');
+                showToast(data.message, data.success ? 'success' : 'error');
+                setTimeout(refreshStatus, 1000);
+            } catch (e) {
+                showToast('启动失败', 'error');
+            }
+        }
+
+        async function stopRelay() {
+            try {
+                const data = await api('/api/stop', 'POST');
+                showToast(data.message, data.success ? 'success' : 'error');
+                setTimeout(refreshStatus, 1000);
+            } catch (e) {
+                showToast('停止失败', 'error');
+            }
+        }
+
+        // ---- Modal ----
+        function showModal() {
+            const overlay = document.getElementById('modalOverlay');
+            overlay.classList.remove('hiding');
+            overlay.style.display = 'flex';
+        }
+
+        function closeModal() {
+            const overlay = document.getElementById('modalOverlay');
+            overlay.classList.add('hiding');
+            setTimeout(() => {
+                overlay.style.display = 'none';
+                overlay.classList.remove('hiding');
+            }, 200);
+        }
+
+        // 点击遮罩关闭
+        document.getElementById('modalOverlay').addEventListener('click', function(e) {
+            if (e.target === this) closeModal();
+        });
+
+        // ---- Copy ----
+        function copyToClipboard(text) {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                return navigator.clipboard.writeText(text);
+            }
+            // fallback
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            return Promise.resolve();
+        }
+
+        function copyRtmpUrl() {
+            if (!currentRtmpUrl) return;
+            const btn = document.getElementById('btnCopyRtmp');
+            const icon = document.getElementById('copyIcon');
+            const text = document.getElementById('copyText');
+            copyToClipboard(currentRtmpUrl).then(() => {
+                btn.classList.add('copied');
+                icon.innerHTML = '&#9989;';
+                text.textContent = '已复制';
+                setTimeout(() => {
+                    btn.classList.remove('copied');
+                    icon.innerHTML = '&#128203;';
+                    text.textContent = '复制地址';
+                }, 2000);
+            });
+        }
+
+        function copyFromModal() {
+            const url = document.getElementById('modalRtmpUrl').textContent;
+            copyToClipboard(url).then(() => {
+                showToast('推流地址已复制到剪贴板');
+            });
+        }
+
+        // ---- Init ----
+        async function init() {
+            await refreshStatus();
+            await loadConfig();
+
+            // 定时刷新
+            refreshTimer = setInterval(() => {
+                refreshStatus();
+                fetchLogs();
+            }, 2000);
+        }
+
+        init();
+    </script>
+</body>
+</html>

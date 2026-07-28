@@ -1,0 +1,35 @@
+proxy: http://127.0.0.1:7890
+youtube_url: https://www.youtube.com/watch?v=XXXXX
+quality: best
+rtmp:
+  host: localhost
+  port: 1935
+  app: live
+  key: youtube
+reconnect:
+  max_retries: 0
+  initial_delay: 3
+  max_delay: 60
+  backoff_factor: 2
+ffmpeg:
+  path: ./ffmpeg/bin/ffmpeg.exe
+  loglevel: warning
+  video_codec: copy
+  audio_codec: copy
+  video_bitrate: ''
+  audio_bitrate: ''
+  extra_args: ''
+mediamtx:
+  path: ./mediamtx/mediamtx.exe
+  config: ./mediamtx/mediamtx.yml
+cookie_server:
+  host: localhost
+  port: 8080
+  cookies_file: cookies.txt
+enable_ui: true
+web_ui:
+  host: localhost
+  port: 5000
+logging:
+  level: INFO
+  file: relay.log

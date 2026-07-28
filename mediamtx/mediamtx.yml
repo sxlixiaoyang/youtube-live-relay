@@ -1,0 +1,28 @@
+# mediamtx 配置 - 仅启用 RTMP
+
+# 日志级别
+logLevel: info
+
+# RTMP 服务
+rtmp: yes
+rtmpAddress: :1935
+
+# RTSP 服务（关闭）
+rtsp: no
+
+# HLS 服务（可选，方便浏览器预览）
+hls: yes
+hlsAddress: :8888
+hlsAlwaysRemux: yes
+
+# WebRTC（关闭）
+webrtc: no
+
+# API
+api: yes
+apiAddress: :9997
+
+# 路径配置
+paths:
+  all:
+    source: publisher

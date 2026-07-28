@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { width: 320px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #1a1a2e; color: #e0e0e0; padding: 16px; }
+h1 { font-size: 16px; text-align: center; margin-bottom: 12px; color: #ff6b6b; }
+.status { background: #12122a; border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+.status-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; font-size: 13px; }
+.status-row .label { color: #888; }
+.status-row .value { color: #4caf50; font-weight: 600; }
+.status-row .value.error { color: #f44336; }
+.btn { width: 100%; padding: 10px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; margin-bottom: 8px; }
+.btn-primary { background: linear-gradient(135deg, #ff4444, #ff6b6b); color: white; }
+.btn-primary:hover { opacity: 0.9; }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.server-url { background: #12122a; border-radius: 8px; padding: 10px; margin-bottom: 12px; }
+.server-url input { width: 100%; background: #1a1a2e; border: 1px solid #3a3a5a; border-radius: 6px; padding: 8px; color: #e0e0e0; font-size: 12px; outline: none; }
+.server-url input:focus { border-color: #ff6b6b; }
+.server-url label { font-size: 12px; color: #888; display: block; margin-bottom: 4px; }
+.tip { font-size: 11px; color: #666; text-align: center; margin-top: 8px; line-height: 1.5; }
+.cookie-count { font-size: 24px; text-align: center; color: #ff6b6b; font-weight: 700; margin: 8px 0; }
+</style>
+</head>
+<body>
+<h1>YouTube Cookies Helper</h1>
+
+<div class="status">
+  <div class="status-row">
+    <span class="label">连接状态</span>
+    <span class="value" id="connStatus">检测中...</span>
+  </div>
+  <div class="status-row">
+    <span class="label">上次发送</span>
+    <span class="value" id="lastSent">从未</span>
+  </div>
+  <div class="cookie-count" id="cookieCount">-</div>
+  <div style="text-align:center; font-size:12px; color:#888;">YouTube Cookies</div>
+</div>
+
+<div class="server-url">
+  <label>服务器地址</label>
+  <input type="text" id="serverUrl" value="http://localhost:8080" />
+</div>
+
+<button class="btn btn-primary" id="btnSend">立即发送Cookies</button>
+
+<div class="tip">
+  打开YouTube页面时自动发送Cookies<br/>
+  也可手动点击按钮发送
+</div>
+
+<script src="popup.js"></script>
+</body>
+</html>
