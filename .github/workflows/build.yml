@@ -1,0 +1,217 @@
+name: build
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: '要构建的分支或 tag（留空使用当前）'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build (${{ matrix.label }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # ----- Windows -----
+          - os: windows-latest
+            label: windows-amd64
+            artifact: youtube-live-relay-windows-amd64
+            archive: zip
+            mediamtx_asset: mediamtx_latest_windows_amd64.zip
+          # ----- macOS Intel -----
+          - os: macos-13
+            label: macos-x86_64
+            artifact: youtube-live-relay-macos-x86_64
+            archive: tar.gz
+            mediamtx_asset: mediamtx_latest_darwin_amd64.tar.gz
+          # ----- macOS Apple Silicon -----
+          - os: macos-14
+            label: macos-arm64
+            artifact: youtube-live-relay-macos-arm64
+            archive: tar.gz
+            mediamtx_asset: mediamtx_latest_darwin_arm64.tar.gz
+          # ----- Linux -----
+          - os: ubuntu-latest
+            label: linux-x86_64
+            artifact: youtube-live-relay-linux-x86_64
+            archive: tar.gz
+            mediamtx_asset: mediamtx_latest_linux_amd64.tar.gz
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref || github.ref }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+
+      - name: Install Python dependencies
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # ============== FFmpeg ==============
+      - name: Prepare FFmpeg (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: bash
+        run: |
+          set -e
+          DEST="$RUNNER_TEMP/ffmpeg-stage/bin"
+          mkdir -p "$DEST"
+          echo "Downloading ffmpeg from gyan.dev..."
+          curl -L --fail -o "$RUNNER_TEMP/ffmpeg.zip" \
+            https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip
+          powershell -NoProfile -Command "Expand-Archive -Path '$RUNNER_TEMP/ffmpeg.zip' -DestinationPath '$RUNNER_TEMP/ffmpeg-stage' -Force"
+          # 把所有 ffmpeg/bin/*.exe 拷到 DEST
+          powershell -NoProfile -Command "Get-ChildItem -Path '$RUNNER_TEMP/ffmpeg-stage' -Recurse -Filter 'ffmpeg.exe' | Select-Object -First 1 | %{ Copy-Item -Path \$_.Directory.FullName+'\\*' -Destination '$DEST' -Force }"
+          echo "FFMPEG_BIN_DIR=$DEST" >> "$GITHUB_ENV"
+          ls -la "$DEST"
+
+      - name: Prepare FFmpeg (macOS)
+        if: matrix.os == 'macos-13' || matrix.os == 'macos-14'
+        shell: bash
+        run: |
+          set -e
+          brew install ffmpeg
+          DEST="$(brew --prefix ffmpeg)/bin"
+          echo "FFMPEG_BIN_DIR=$DEST" >> "$GITHUB_ENV"
+          ls -la "$DEST" | head -20
+
+      - name: Prepare FFmpeg (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: |
+          set -e
+          sudo apt-get update -qq
+          sudo apt-get install -y xz-utils
+          echo "Downloading static ffmpeg from johnvansickle..."
+          curl -L --fail -o "$RUNNER_TEMP/ffmpeg.tar.xz" \
+            https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
+          mkdir -p "$RUNNER_TEMP/ffmpeg-stage"
+          tar -xJf "$RUNNER_TEMP/ffmpeg.tar.xz" -C "$RUNNER_TEMP/ffmpeg-stage"
+          # 找到解压后的 bin 目录
+          DEST=$(find "$RUNNER_TEMP/ffmpeg-stage" -type d -name bin | head -1)
+          echo "FFMPEG_BIN_DIR=$DEST" >> "$GITHUB_ENV"
+          ls -la "$DEST"
+
+      # ============== mediamtx ==============
+      - name: Download mediamtx
+        shell: bash
+        run: |
+          set -e
+          URL="https://github.com/bluenviron/mediamtx/releases/latest/download/${{ matrix.mediamtx_asset }}"
+          echo "Downloading: $URL"
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            OUT="$RUNNER_TEMP/mediamtx.zip"
+            curl -L --fail -o "$OUT" "$URL"
+            powershell -NoProfile -Command "Expand-Archive -Path '$OUT' -DestinationPath '$RUNNER_TEMP/mediamtx-stage' -Force"
+            EXE="mediamtx.exe"
+          else
+            OUT="$RUNNER_TEMP/mediamtx.tar.gz"
+            curl -L --fail -o "$OUT" "$URL"
+            mkdir -p "$RUNNER_TEMP/mediamtx-stage"
+            tar -xzf "$OUT" -C "$RUNNER_TEMP/mediamtx-stage"
+            EXE="mediamtx"
+            chmod +x "$RUNNER_TEMP/mediamtx-stage/$EXE"
+          fi
+          echo "MEDIAMTX_DIR=$RUNNER_TEMP/mediamtx-stage" >> "$GITHUB_ENV"
+          echo "MEDIAMTX_EXE=$EXE" >> "$GITHUB_ENV"
+          ls -la "$RUNNER_TEMP/mediamtx-stage"
+
+      # ============== PyInstaller ==============
+      - name: Run PyInstaller
+        shell: bash
+        run: |
+          python build.py --clean
+
+      # ============== Bundle ==============
+      - name: Stage release files (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: bash
+        run: |
+          set -e
+          DIST="dist/youtube-relay"
+          cp config.yaml.example "$DIST/" 2>/dev/null || true
+          mkdir -p "$DIST/ffmpeg/bin"
+          # 拷贝 ffmpeg 目录全部内容
+          cp -r "$FFMPEG_BIN_DIR"/. "$DIST/ffmpeg/bin/"
+          # 拷贝 mediamtx
+          cp "$MEDIAMTX_DIR/$MEDIAMTX_EXE" "$DIST/mediamtx/"
+          ls -la "$DIST"
+          ls -la "$DIST/mediamtx"
+          ls -la "$DIST/ffmpeg/bin"
+
+      - name: Stage release files (macOS / Linux)
+        if: matrix.os != 'windows-latest'
+        shell: bash
+        run: |
+          set -e
+          DIST="dist/youtube-relay"
+          cp config.yaml.example "$DIST/" 2>/dev/null || true
+          mkdir -p "$DIST/ffmpeg/bin"
+          cp -r "$FFMPEG_BIN_DIR"/. "$DIST/ffmpeg/bin/"
+          cp "$MEDIAMTX_DIR/$MEDIAMTX_EXE" "$DIST/mediamtx/"
+          chmod +x "$DIST/mediamtx/mediamtx"
+          chmod +x "$DIST/youtube-relay"
+          ls -la "$DIST"
+          ls -la "$DIST/mediamtx"
+          ls -la "$DIST/ffmpeg/bin"
+
+      # ============== Archive ==============
+      - name: Create zip archive (Windows)
+        if: matrix.archive == 'zip'
+        shell: bash
+        run: |
+          powershell -NoProfile -Command "Compress-Archive -Path 'dist/youtube-relay' -DestinationPath '${{ matrix.artifact }}.zip' -Force"
+          ls -la "${{ matrix.artifact }}.zip"
+
+      - name: Create tar.gz archive (macOS / Linux)
+        if: matrix.archive == 'tar.gz'
+        shell: bash
+        run: |
+          tar -czf "${{ matrix.artifact }}.tar.gz" -C dist youtube-relay
+          ls -la "${{ matrix.artifact }}.tar.gz"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}.${{ matrix.archive }}
+          if-no-files-found: error
+          retention-days: 30
+
+  release:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**/*
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
