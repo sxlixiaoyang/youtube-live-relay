@@ -15,6 +15,12 @@ import subprocess
 import sys
 import platform
 
+# 确保控制台输出 UTF-8（Windows cp1252 无法处理中文）
+if sys.stdout.encoding and sys.stdout.encoding.lower() not in ('utf-8', 'utf8'):
+    sys.stdout.reconfigure(encoding='utf-8')
+if sys.stderr.encoding and sys.stderr.encoding.lower() not in ('utf-8', 'utf8'):
+    sys.stderr.reconfigure(encoding='utf-8')
+
 # ---- 配置 ----
 APP_NAME = "youtube-relay"
 MAIN_SCRIPT = "main.py"
