@@ -181,13 +181,3 @@ xattr -cr youtube-relay/ffmpeg/bin/ffmpeg
 ```
 
 或右键 → 打开 → 弹出确认对话框中点「打开」。
-
-### 自行触发打包
-
-```bash
-# 推送 tag 自动构建并发布 Release
-git tag v0.1.0
-git push origin v0.1.0
-```
-
-也可在 GitHub 仓库页 → Actions → Build → Run workflow 手动触发。

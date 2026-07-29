@@ -14,6 +14,9 @@ on:
 permissions:
   contents: write
 
+env:
+  MEDIAMTX_VERSION: v1.19.3
+
 jobs:
   build:
     name: Build (${{ matrix.label }})
@@ -27,25 +30,29 @@ jobs:
             label: windows-amd64
             artifact: youtube-live-relay-windows-amd64
             archive: zip
-            mediamtx_asset: mediamtx_latest_windows_amd64.zip
+            mt_os: windows
+            mt_arch: amd64
           # ----- macOS Intel -----
           - os: macos-13
             label: macos-x86_64
             artifact: youtube-live-relay-macos-x86_64
             archive: tar.gz
-            mediamtx_asset: mediamtx_latest_darwin_amd64.tar.gz
+            mt_os: darwin
+            mt_arch: amd64
           # ----- macOS Apple Silicon -----
           - os: macos-14
             label: macos-arm64
             artifact: youtube-live-relay-macos-arm64
             archive: tar.gz
-            mediamtx_asset: mediamtx_latest_darwin_arm64.tar.gz
+            mt_os: darwin
+            mt_arch: arm64
           # ----- Linux -----
           - os: ubuntu-latest
             label: linux-x86_64
             artifact: youtube-live-relay-linux-x86_64
             archive: tar.gz
-            mediamtx_asset: mediamtx_latest_linux_amd64.tar.gz
+            mt_os: linux
+            mt_arch: amd64
 
     steps:
       - name: Checkout
@@ -66,33 +73,39 @@ jobs:
           pip install -r requirements.txt
 
       # ============== FFmpeg ==============
-      - name: Prepare FFmpeg (Windows)
+      - name: Install ffmpeg (Windows / gyan.dev)
         if: matrix.os == 'windows-latest'
         shell: bash
         run: |
           set -e
-          DEST="$RUNNER_TEMP/ffmpeg-stage/bin"
-          mkdir -p "$DEST"
+          rm -rf "$RUNNER_TEMP/ffmpeg-stage"
+          mkdir -p "$RUNNER_TEMP/ffmpeg-stage"
           echo "Downloading ffmpeg from gyan.dev..."
           curl -L --fail -o "$RUNNER_TEMP/ffmpeg.zip" \
             https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip
+          # 用 PowerShell 解压到临时目录（Git Bash 解压 zip 不可靠）
           powershell -NoProfile -Command "Expand-Archive -Path '$RUNNER_TEMP/ffmpeg.zip' -DestinationPath '$RUNNER_TEMP/ffmpeg-stage' -Force"
-          # 把所有 ffmpeg/bin/*.exe 拷到 DEST
-          powershell -NoProfile -Command "Get-ChildItem -Path '$RUNNER_TEMP/ffmpeg-stage' -Recurse -Filter 'ffmpeg.exe' | Select-Object -First 1 | %{ Copy-Item -Path \$_.Directory.FullName+'\\*' -Destination '$DEST' -Force }"
-          echo "FFMPEG_BIN_DIR=$DEST" >> "$GITHUB_ENV"
-          ls -la "$DEST"
+          # gyan.dev 解压后是 ffmpeg-X.Y-essentials_build/bin/ffmpeg.exe
+          FFMPEG_BIN_DIR=$(find "$RUNNER_TEMP/ffmpeg-stage" -type d -name bin | head -1)
+          if [ -z "$FFMPEG_BIN_DIR" ]; then
+            echo "::error::ffmpeg bin/ dir not found"
+            find "$RUNNER_TEMP/ffmpeg-stage" -maxdepth 3 -type d
+            exit 1
+          fi
+          echo "FFMPEG_BIN_DIR=$FFMPEG_BIN_DIR" >> "$GITHUB_ENV"
+          ls -la "$FFMPEG_BIN_DIR"
 
-      - name: Prepare FFmpeg (macOS)
+      - name: Install ffmpeg (macOS / brew)
         if: matrix.os == 'macos-13' || matrix.os == 'macos-14'
         shell: bash
         run: |
           set -e
           brew install ffmpeg
-          DEST="$(brew --prefix ffmpeg)/bin"
-          echo "FFMPEG_BIN_DIR=$DEST" >> "$GITHUB_ENV"
-          ls -la "$DEST" | head -20
+          FFMPEG_BIN_DIR="$(brew --prefix ffmpeg)/bin"
+          echo "FFMPEG_BIN_DIR=$FFMPEG_BIN_DIR" >> "$GITHUB_ENV"
+          ls -la "$FFMPEG_BIN_DIR" | head -20
 
-      - name: Prepare FFmpeg (Linux)
+      - name: Install ffmpeg (Linux / johnvansickle)
         if: matrix.os == 'ubuntu-latest'
         shell: bash
         run: |
@@ -102,29 +115,38 @@ jobs:
           echo "Downloading static ffmpeg from johnvansickle..."
           curl -L --fail -o "$RUNNER_TEMP/ffmpeg.tar.xz" \
             https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
+          rm -rf "$RUNNER_TEMP/ffmpeg-stage"
           mkdir -p "$RUNNER_TEMP/ffmpeg-stage"
           tar -xJf "$RUNNER_TEMP/ffmpeg.tar.xz" -C "$RUNNER_TEMP/ffmpeg-stage"
-          # 找到解压后的 bin 目录
-          DEST=$(find "$RUNNER_TEMP/ffmpeg-stage" -type d -name bin | head -1)
-          echo "FFMPEG_BIN_DIR=$DEST" >> "$GITHUB_ENV"
-          ls -la "$DEST"
+          # johnvansickle 静态版没有 bin/ 子目录，二进制直接在解压目录里
+          FFMPEG_BIN_DIR=$(find "$RUNNER_TEMP/ffmpeg-stage" -type f -name ffmpeg | head -1 | xargs dirname)
+          if [ -z "$FFMPEG_BIN_DIR" ]; then
+            echo "::error::ffmpeg binary not found"
+            find "$RUNNER_TEMP/ffmpeg-stage" -maxdepth 3 -type f
+            exit 1
+          fi
+          echo "FFMPEG_BIN_DIR=$FFMPEG_BIN_DIR" >> "$GITHUB_ENV"
+          ls -la "$FFMPEG_BIN_DIR"
 
       # ============== mediamtx ==============
       - name: Download mediamtx
         shell: bash
         run: |
           set -e
-          URL="https://github.com/bluenviron/mediamtx/releases/latest/download/${{ matrix.mediamtx_asset }}"
+          case "${{ matrix.os }}" in
+            windows-latest) EXT=zip ;;
+            *)              EXT=tar.gz ;;
+          esac
+          URL="https://github.com/bluenviron/mediamtx/releases/download/${MEDIAMTX_VERSION}/mediamtx_${MEDIAMTX_VERSION}_${{ matrix.mt_os }}_${{ matrix.mt_arch }}.${EXT}"
           echo "Downloading: $URL"
-          if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            OUT="$RUNNER_TEMP/mediamtx.zip"
-            curl -L --fail -o "$OUT" "$URL"
+          OUT="$RUNNER_TEMP/mediamtx.${EXT}"
+          curl -L --fail -o "$OUT" "$URL"
+          rm -rf "$RUNNER_TEMP/mediamtx-stage"
+          mkdir -p "$RUNNER_TEMP/mediamtx-stage"
+          if [ "$EXT" = "zip" ]; then
             powershell -NoProfile -Command "Expand-Archive -Path '$OUT' -DestinationPath '$RUNNER_TEMP/mediamtx-stage' -Force"
             EXE="mediamtx.exe"
           else
-            OUT="$RUNNER_TEMP/mediamtx.tar.gz"
-            curl -L --fail -o "$OUT" "$URL"
-            mkdir -p "$RUNNER_TEMP/mediamtx-stage"
             tar -xzf "$OUT" -C "$RUNNER_TEMP/mediamtx-stage"
             EXE="mediamtx"
             chmod +x "$RUNNER_TEMP/mediamtx-stage/$EXE"
@@ -148,12 +170,13 @@ jobs:
           DIST="dist/youtube-relay"
           cp config.yaml.example "$DIST/" 2>/dev/null || true
           mkdir -p "$DIST/ffmpeg/bin"
-          # 拷贝 ffmpeg 目录全部内容
-          cp -r "$FFMPEG_BIN_DIR"/. "$DIST/ffmpeg/bin/"
-          # 拷贝 mediamtx
+          cp -r "$FFMPEG_BIN_DIR"/* "$DIST/ffmpeg/bin/"
           cp "$MEDIAMTX_DIR/$MEDIAMTX_EXE" "$DIST/mediamtx/"
+          echo "=== dist/youtube-relay ==="
           ls -la "$DIST"
+          echo "=== mediamtx ==="
           ls -la "$DIST/mediamtx"
+          echo "=== ffmpeg/bin ==="
           ls -la "$DIST/ffmpeg/bin"
 
       - name: Stage release files (macOS / Linux)
@@ -164,12 +187,15 @@ jobs:
           DIST="dist/youtube-relay"
           cp config.yaml.example "$DIST/" 2>/dev/null || true
           mkdir -p "$DIST/ffmpeg/bin"
-          cp -r "$FFMPEG_BIN_DIR"/. "$DIST/ffmpeg/bin/"
+          cp -r "$FFMPEG_BIN_DIR"/* "$DIST/ffmpeg/bin/"
           cp "$MEDIAMTX_DIR/$MEDIAMTX_EXE" "$DIST/mediamtx/"
           chmod +x "$DIST/mediamtx/mediamtx"
           chmod +x "$DIST/youtube-relay"
+          echo "=== dist/youtube-relay ==="
           ls -la "$DIST"
+          echo "=== mediamtx ==="
           ls -la "$DIST/mediamtx"
+          echo "=== ffmpeg/bin ==="
           ls -la "$DIST/ffmpeg/bin"
 
       # ============== Archive ==============
