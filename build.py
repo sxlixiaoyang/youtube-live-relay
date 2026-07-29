@@ -41,6 +41,7 @@ COPY_FILES = [
 COPY_DIRS = [
     "chrome-extension",
     "mediamtx",
+    "ffmpeg",
 ]
 
 # PyInstaller 隐式导入（无法自动检测的模块）
