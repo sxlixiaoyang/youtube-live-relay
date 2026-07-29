@@ -129,7 +129,16 @@ jobs:
         run: |
           python --version
           python -c "import sys; print(f'sys.executable: {sys.executable}')"
-          python build.py 2>&1
+          python -c "import os; print(f'cwd: {os.getcwd()}'); [print(f) for f in os.listdir('.')]"
+          python -u build.py 2>&1 | Tee-Object -FilePath build_log.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Upload build log (on failure)
+        if: failure() && matrix.platform == 'windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log-windows
+          path: build_log.txt
 
       - name: Package (Windows)
         if: matrix.platform == 'windows'
@@ -178,7 +187,16 @@ jobs:
         run: |
           python --version
           python -c "import sys; print(f'sys.executable: {sys.executable}')"
-          python build_player.py 2>&1
+          python -c "import os; print(f'cwd: {os.getcwd()}'); [print(f) for f in os.listdir('.')]"
+          python -u build_player.py 2>&1 | Tee-Object -FilePath build_player_log.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Upload player build log (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log-player
+          path: build_player_log.txt
 
       - name: Package player
         shell: pwsh
