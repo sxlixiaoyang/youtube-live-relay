@@ -15,14 +15,6 @@ import subprocess
 import sys
 import platform
 
-# Windows 控制台默认 cp1252，强制 UTF-8 避免中文 print 报错
-if sys.platform == "win32":
-    try:
-        sys.stdout.reconfigure(encoding="utf-8")
-        sys.stderr.reconfigure(encoding="utf-8")
-    except (AttributeError, ValueError):
-        pass
-
 # ---- 配置 ----
 APP_NAME = "youtube-relay"
 MAIN_SCRIPT = "main.py"
