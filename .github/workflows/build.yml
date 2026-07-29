@@ -54,6 +54,11 @@ jobs:
             mt_os: linux
             mt_arch: amd64
 
+    defaults:
+      run:
+        env:
+          PYTHONIOENCODING: utf-8
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
