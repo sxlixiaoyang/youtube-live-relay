@@ -15,21 +15,21 @@ jobs:
           - os: windows-latest
             platform: windows
             arch: amd64
-            mediamtx_url: https://github.com/bluenviron/mediamtx/releases/download/v1.11.3/mediamtx_windows_amd64.zip
+            mediamtx_url: https://github.com/bluenviron/mediamtx/releases/download/v1.19.3/mediamtx_v1.19.3_windows_amd64.zip
             binary_ext: .exe
             archive_ext: .zip
 
           - os: ubuntu-latest
             platform: linux
             arch: amd64
-            mediamtx_url: https://github.com/bluenviron/mediamtx/releases/download/v1.11.3/mediamtx_linux_amd64.tar.gz
+            mediamtx_url: https://github.com/bluenviron/mediamtx/releases/download/v1.19.3/mediamtx_v1.19.3_linux_amd64.tar.gz
             binary_ext: ''
             archive_ext: .tar.gz
 
           - os: macos-latest
             platform: macos
             arch: amd64
-            mediamtx_url: https://github.com/bluenviron/mediamtx/releases/download/v1.11.3/mediamtx_darwin_amd64.tar.gz
+            mediamtx_url: https://github.com/bluenviron/mediamtx/releases/download/v1.19.3/mediamtx_v1.19.3_darwin_amd64.tar.gz
             binary_ext: ''
             archive_ext: .tar.gz
 
