@@ -125,7 +125,11 @@ jobs:
 
       # ---- 打包 ----
       - name: Build with PyInstaller
-        run: python build.py
+        shell: pwsh
+        run: |
+          python --version
+          python -c "import sys; print(f'sys.executable: {sys.executable}')"
+          python build.py 2>&1
 
       - name: Package (Windows)
         if: matrix.platform == 'windows'
@@ -170,7 +174,11 @@ jobs:
         run: pip install python-vlc
 
       - name: Build player with PyInstaller
-        run: python build_player.py
+        shell: pwsh
+        run: |
+          python --version
+          python -c "import sys; print(f'sys.executable: {sys.executable}')"
+          python build_player.py 2>&1
 
       - name: Package player
         shell: pwsh
