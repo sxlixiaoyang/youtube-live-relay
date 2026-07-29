@@ -104,30 +104,23 @@ jobs:
           echo "mediamtx installed at mediamtx/mediamtx"
 
       # ---- 配置 ----
-      - name: Generate config.yaml for CI
-        run: |
-          python -c "
-import yaml, platform
-with open('config.yaml.example') as f:
-    config = yaml.safe_load(f)
-if platform.system() != 'Windows':
-    config['ffmpeg']['path'] = './ffmpeg/ffmpeg'
-    config['mediamtx']['path'] = './mediamtx/mediamtx'
-with open('config.yaml', 'w') as f:
-    yaml.dump(config, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
-print('config.yaml created for', platform.system())
-"
-
-      # 创建空 cookies.txt（可选，避免 build.py 警告）
-      - name: Create empty cookies.txt
-        run: |
-          New-Item -ItemType File -Name cookies.txt -Force | Out-Null
-        shell: pwsh
+      - name: Generate config.yaml for CI (Windows)
         if: matrix.platform == 'windows'
+        run: copy config.yaml.example config.yaml
 
-      - name: Create empty cookies.txt
-        run: touch cookies.txt
+      - name: Generate config.yaml for CI (Linux/macOS)
         if: matrix.platform != 'windows'
+        run: |
+          cp config.yaml.example config.yaml
+          python -c "import yaml;c=yaml.safe_load(open('config.yaml'));c['ffmpeg']['path']='./ffmpeg/ffmpeg';c['mediamtx']['path']='./mediamtx/mediamtx';yaml.dump(c,open('config.yaml','w'),allow_unicode=True,default_flow_style=False,sort_keys=False)"
+
+      - name: Create empty cookies.txt (Windows)
+        if: matrix.platform == 'windows'
+        run: echo $null >> cookies.txt
+
+      - name: Create empty cookies.txt (Linux/macOS)
+        if: matrix.platform != 'windows'
+        run: touch cookies.txt
 
       # ---- 打包 ----
       - name: Build with PyInstaller
